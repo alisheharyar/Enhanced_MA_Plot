@@ -1,4 +1,6 @@
-library("ggpubr")
+# ggmaplot2 is modified from https://github.com/kassambara/ggpubr/blob/master/R/ggmaplot.R
+# ggmaplot from library("ggpubr")  
+# it serves at plotting the MAplot in Enhanced MA plot V2
 
 parse_font <- function(font){
   if(is.null(font)) res <- NULL
@@ -16,21 +18,73 @@ parse_font <- function(font){
   res
 }
 
-ggmaplot2<-function (data, indToTrack=NULL,indToHighlight=NULL, fdr = 0.05, fc = 1.5, genenames = NULL, detection_call = NULL,
+ggmaplot2<-function (data, indToTrack=NULL,indToHighlight=NULL, fdr = 0.05, fc = 1.5, genenames = NULL, detectionCall = NULL,
                      sizepts = 5, 
                      font.label = c(12, "plain", "black"), font.legend = "bold", font.main = "bold", 
                      label.rectangle = FALSE,
                      palette = c("#B31B21", "#1465AC", "darkgray", "yellow","green"), top = 15,
-                     select.top.method = c("padj", "fc"), main = NULL, xlab = "Log2 mean expression",
-                     ylab = "Log2 fold change", ggtheme = theme_classic(), legend = "top", 
+                     select.top.method = c("pAdj", "fc"), main = NULL, 
+                     xlab = "Log2 mean expression",
+                     ylab = "Log2 fold change", 
+                     ggtheme = theme_classic(), 
+                     legend = "top", 
                      discrete=T, p,
                      ...)
 {
+  #'MA-plot from means and log fold changes
+  #'@description Make MA-plot which is a scatter plot of log2 fold changes (M, on
+  #'  the y-axis) versus the average expression signal (A, on the x-axis). \code{M
+  #'  = log2(x/y)} and \code{A = (log2(x) + log2(y))/2 = log2(xy)*1/2}, where x
+  #'  and y are respectively the mean of the two groups being compared.
+  #'@inheritParams ggboxplot
+  #'@inheritParams ggpar
+  #'@param data an object of class DESeqResults, get_diff, DE_Results, matrix or
+  #'  data frame containing the columns baseMean (or baseMeanLog2),
+  #'  log2FoldChange, and padj. Rows are genes.
+  #'
+  #'  Format accepted for the input data: \
+  #'  \code{baseMean | log2FoldChange | pAdj | (detectionCall)}. This is a typical output from
+  #'  DESeq2 pipeline. we use log2(baseMean+!) as the x-axis variable.
+  #'  
+  #'  Terminology:
+  #'
+  #'  \itemize{ \item baseMean: the mean expression of genes in the two groups.
+  #'  \item log2FoldChange: the log2 fold changes of group 2 compared to group 1
+  #'  \item pAdj: the adjusted p-value of the used statiscal test. }
+  #'@param fdr Accepted false discovery rate for considering genes as
+  #'  differentially expressed.
+  #'@param fc the fold change threshold. Only genes with a fold change >= fc and
+  #'  pAdj <= fdr are considered as significantly differentially expressed.
+  #'@param genenames a character vector of length nrow(data) specifying gene names
+  #'  corresponding to each row. Used for point labels.
+  #'@param detectionCall a numeric vector with length = nrow(data), specifying if
+  #'  the genes is expressed (value = 1) or not (value = 0). For example
+  #'  detectionCall = c(1, 1, 0, 1, 0, 1). Default is NULL. If detectionCall
+  #'  column is available in data, it will be used.
+  #'@param size points size.
+  #'@param alpha numeric value betwenn 0 an 1 specifying point alpha for
+  #'  controlling transparency. For example, use alpha = 0.5.
+  #'@param font.label a vector of length 3 indicating respectively the size (e.g.:
+  #'  14), the style (e.g.: "plain", "bold", "italic", "bold.italic") and the
+  #'  color (e.g.: "red") of point labels. For example \emph{font.label = c(14,
+  #'  "bold", "red")}.
+  #'@param label.rectangle logical value. If TRUE, add rectangle underneath the
+  #'  text, making it easier to read.
+  #'@param top the number of top genes to be shown on the plot. Use top = 0 to
+  #'  hide to gene labels.
+  #'@param select.top.method methods to be used for selecting top genes. Allowed
+  #'  values include "padj" and "fc" for selecting by adjusted p values or fold
+  #'  changes, respectively.
+  #'@param label.select character vector specifying some labels to show.
+  #'@param ... other arguments to be passed to \code{\link{ggpar}}.
+  #'@return returns a ggplot.
+  # 
   
   data_orig <- data
-  # ggmaplot2 is same as ggmaplot from library("ggpubr") except for the colorscale: 
-  # we added a color for the NA values in the padj column of data.
-  # palette is a list of colors for (up, down, non-significant, not available) values of padj respectively
+  # ggmaplot2 is modified from https://github.com/kassambara/ggpubr/blob/master/R/ggmaplot.R
+  # ggmaplot from library("ggpubr") except for the colorscale: 
+  # we added a color for the NA values in the pAdj column of data.
+  # palette is a list of colors for (up, down, non-significant, not available) values of pAdj respectively
   # by Default: Palette=c("#B31B21", "#1465AC", "darkgray", "yellow")
   #
   # PARAMETERS FOR TESTING
@@ -45,7 +99,7 @@ ggmaplot2<-function (data, indToTrack=NULL,indToHighlight=NULL, fdr = 0.05, fc =
   # legend = "top"
   # top = 20
   # ggtheme = ggplot2::theme_minimal()
-  # select.top.method = "padj" #c("padj", "fc")
+  # select.top.method = "pAdj" #c("pAdj", "fc")
   # label.rectangle=TRUE
   # 
   # sizepts=0.4
@@ -57,18 +111,18 @@ ggmaplot2<-function (data, indToTrack=NULL,indToHighlight=NULL, fdr = 0.05, fc =
                               "DE_Results", "DESeqResults")))
     stop("data must be an object of class matrix, data.frame, DataFrame, DE_Results or DESeqResults")
   
-  detection_call<-data$detection_call
+  detectionCall<-data$detectionCall
   
-  if (!is.null(detection_call)) {
-    if (nrow(data) != length(detection_call))
-      stop("detection_call must be a numeric vector of length = nrow(data)")
-  }  else if ("detection_call" %in% colnames(data)) {
-    detection_call <- as.vector(data$detection_call)
-  }  else detection_call = rep(1, nrow(data))
+  if (!is.null(detectionCall)) {
+    if (nrow(data) != length(detectionCall))
+      stop("detectionCall must be a numeric vector of length = nrow(data)")
+  }  else if ("detectionCall" %in% colnames(data)) {
+    detectionCall <- as.vector(data$detectionCall)
+  }  else detectionCall = rep(1, nrow(data))
   
   if (is.null(legend)) 
     legend <- c(0.12, 0.9)
-  ss <- base::setdiff(c("baseMean", "log2FoldChange", "padj"), 
+  ss <- base::setdiff(c("baseMean", "log2FoldChange", "pAdj"), 
                       colnames(data))
   if (length(ss) > 0) 
     stop("The colnames of data must contain: ", paste(ss, 
@@ -80,11 +134,11 @@ ggmaplot2<-function (data, indToTrack=NULL,indToHighlight=NULL, fdr = 0.05, fc =
     stop("genenames should be of length nrow(data).")
   sig = setMAColor(fdr, data) #,indToTrack)
     # sig <- rep(3, nrow(data))
-  # sig[which(data$padj <= fdr & data$log2FoldChange < 0 & abs(data$log2FoldChange) >= 
-  #             log2(fc) & detection_call == 1)] = 2
-  # sig[which(data$padj <= fdr & data$log2FoldChange > 0 & abs(data$log2FoldChange) >= 
-  #             log2(fc) & detection_call == 1)] = 1
-  # sig[which(is.na(data$padj))] = 4
+  # sig[which(data$pAdj <= fdr & data$log2FoldChange < 0 & abs(data$log2FoldChange) >= 
+  #             log2(fc) & detectionCall == 1)] = 2
+  # sig[which(data$pAdj <= fdr & data$log2FoldChange > 0 & abs(data$log2FoldChange) >= 
+  #             log2(fc) & detectionCall == 1)] = 1
+  # sig[which(is.na(data$pAdj))] = 4
   
  
   T <- fdr
@@ -92,11 +146,12 @@ ggmaplot2<-function (data, indToTrack=NULL,indToHighlight=NULL, fdr = 0.05, fc =
                      #mean = data$baseMean,
                      log2mean=log2(data$baseMean + 1),
                      log2FC = data$log2FoldChange, 
-                     padj = data$padj, 
+                     pAdj = data$pAdj, 
                      sig = sig,
                      pFold = data$pFold,
                      pFoldDummy = cut(handle$MAdataCur$pFold, 
-                                      breaks=c(-1, -T-2*(1-T)/3, -T-(1-T)/3 ,-T, 0, T, T+(1-T)/3,T+(1-T)/3*2, 1), 
+                                      #breaks=c(-1, -T-2*(1-T)/3, -T-(1-T)/3 ,-T, 0, T, T+(1-T)/3,T+(1-T)/3*2, 1), 
+                                      breaks=c(-1, -T, -2*T/3 ,-T/3, 0, T/3, 2*T/3, T,  1), 
                                       labels = c("Down-gray", "Down-low", "Down-mid", "Down-high", 
                                                  "Up-high", "Up-mid", "Up-low", "Up-gray")),
                      tracked=rep(FALSE,nrow(data)), 
@@ -120,15 +175,15 @@ ggmaplot2<-function (data, indToTrack=NULL,indToHighlight=NULL, fdr = 0.05, fc =
   
    
   # select.top.method <- match.arg(select.top.method)
-  if (select.top.method == "padj") 
+  if (select.top.method == "pAdj") 
   {
-    data <- data[order(data$padj), ]
+    data <- data[order(data$pAdj), ]
     
   }else if (select.top.method == "fc") 
     data <- data[order(abs(data$log2FC), decreasing = TRUE), 
                  ]
   labs_data <- stats::na.omit(data)
-  labs_data <- subset(labs_data, padj <= fdr & name != "" & 
+  labs_data <- subset(labs_data, pAdj <= fdr & name != "" & 
                         abs(log2FC) >= log2(fc))
   labs_data <- utils::head(labs_data, top)
   
@@ -140,7 +195,7 @@ ggmaplot2<-function (data, indToTrack=NULL,indToHighlight=NULL, fdr = 0.05, fc =
   font.label$face <- ifelse(is.null(font.label$face), "plain", 
                             font.label$face)
   set.seed(42)
-  mean <- log2FC <- sig <- name <- padj <- NULL
+  mean <- log2FC <- sig <- name <- pAdj <- NULL
   # p <- ggplot(data, aes(x =log2mean, y = log2FC, label=  name)) + 
   #   geom_point(aes(color = sig), size = sizepts) +
 
@@ -196,9 +251,9 @@ ggmaplot2<-function (data, indToTrack=NULL,indToHighlight=NULL, fdr = 0.05, fc =
                         aes(x = log2mean, y = log2FC, label=name, 
                             fill=pFoldDummy, colour=pFoldDummy, 
                             text=paste0('</br>Gene name: ', name, '</br>',
-                                       'P-value: ', format(padj, digits=5), '</br>',
-                                       'X: ', round(log2mean, digits = 2), '</br>',
-                                       'Y: ', round(log2FC, digits = 2), '</br>')), 
+                                       'P-value: ', format(pAdj, digits=5), '</br>',
+                                       'Log2(Mean Expression): ', round(log2mean, digits = 2), '</br>',
+                                       'Log2(Fold Change): ', round(log2FC, digits = 2), '</br>')), 
                         size = 1.5, stroke=0,
                         pch = 21) + 
       
@@ -235,9 +290,9 @@ ggmaplot2<-function (data, indToTrack=NULL,indToHighlight=NULL, fdr = 0.05, fc =
   p <- p + scale_x_continuous(breaks = seq(0, max(data$log2mean), 2)) 
   
   p <- p + labs(x = xlab, y = ylab, title = main, color = "") 
-  p <- p + geom_hline(yintercept = c(0, -log2(fc), log2(fc)), 
-                      linetype = c(1, 2, 2), 
-                      color = c("black", "black", "black"))
+  #p <- p + geom_hline(yintercept = c(0, -log2(fc), log2(fc)), # dashed lines across the plot
+  #                    linetype = c(1, 2, 2), 
+  #                    color = c("black", "black", "black"))
   
   if(discrete) {
     p <- ggpar(p, palette = palette)

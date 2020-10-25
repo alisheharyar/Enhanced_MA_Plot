@@ -1,4 +1,23 @@
-
+# Copyright: Ali Sheharyar (Texas AM University at Qatar), Michael Aupetit (Qatar Computing Research Institute)
+# October 25, 2020
+# Code Version 2
+# This file is part of "Enhanced MA plot"
+# 
+# "Enhanced MA plot" is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version. (GPL-3 or later)
+# 
+# "Enhanced MA plot" is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with "Enhanced MA plot" in the "COPYING" file  If not, see <https://www.gnu.org/licenses/>.
+#
+# Please cite the Github the code as: 
+# https://github.com/alisheharyar/Enhanced_MA_Plot
 
 
 ###########################
@@ -59,8 +78,8 @@ plotPFoldLegend = function(handle) {
   
   data <- data.frame(log2mean=log2(data$baseMean + 1),
                      log2FC = data$log2FoldChange, 
-                     padj = data$padj, 
-                     pFold = data$padj*(data$log2FoldChange/abs(data$log2FoldChange)),
+                     padj = data$pAdj, 
+                     pFold = data$pAdj*(data$log2FoldChange/abs(data$log2FoldChange)),
                      pFoldDummy = cut(handle$MAdataCur$pFold, 
                                       breaks=c(-1, -T-2*(1-T)/3*2, -T-(1-T)/3 ,-T, 0, T, T+(1-T)/3,T+2*(1-T)/3, 1), 
                                       labels = c("Down-gray", "Down-low", "Down-mid", "Down-high", 
@@ -139,8 +158,23 @@ plotMA = function(handle, showHighlight=FALSE, title=NULL, discrete=T, filterX, 
   }
   
   p <- p + coord_cartesian(xlim=handle$ranges$X, ylim = handle$ranges$Y)
-  p <- ggmaplot2 ( data=handle$MAdataCur, indToTrack=handle$MAindToTrack, indToHighlight=handle$MAindToHighlight  ,fdr = handle$fdrVal, fc = 1.5, 
-                  genenames = handle$MAdataCur$name, detection_call = NULL, sizepts = 0.4,                       
+  
+  if (showHighlight & !is.null(handle$MAdataCur))
+    if (length(handle$MAindToHighlight)>0)
+    {
+      p <- p +  
+        geom_point(data=handle$MAdataCur[handle$MAindToHighlight,], 
+                   aes(x=log2(baseMean+1), y=log2FoldChange), 
+                   size = 2, color="orange", fill = "orange",# fill=NA, 
+                   stroke = 0.5, pch = 21)
+    }
+  
+  p <- ggmaplot2 ( data=handle$MAdataCur, 
+                   indToTrack=handle$MAindToTrack, 
+                   indToHighlight=NULL,
+                   fdr = handle$fdrVal, 
+                   fc = 1.5, 
+                  genenames = handle$MAdataCur$geneName, detectionCall = NULL, sizepts = 0.4,                       
                   font.label = c(12, "plain", "black"), 
                   font.legend = "bold", font.main = "bold", 
                   label.rectangle = FALSE, 
@@ -151,11 +185,8 @@ plotMA = function(handle, showHighlight=FALSE, title=NULL, discrete=T, filterX, 
                   ggtheme = theme_classic(),legend = "top", 
                   discrete=discrete, p)
   
-  if (showHighlight) 
-    p <- p +  
-      geom_point(data=maData[which(is.element(maData$name, unique(handle$maPlotHighlight$gene))),], 
-                 aes(x=log2(baseMean+1), y=log2FoldChange), color="#000000", size=3)
   
+
   return( p )
 }
 
@@ -169,19 +200,24 @@ plotMA = function(handle, showHighlight=FALSE, title=NULL, discrete=T, filterX, 
 ##assign color to gene names based on fdr significance value in MA Data
 assignColorToGene = function(handle, maData){
   geneColor <- NULL
-  geneColor$gene = maData$name
-  sig=setMAColor(handle$fdrVal, maData) #, handle$indToTrack)
-  geneColor$color = handle$maColor[sig]
+  if (!is.null(maData)){
+    geneColor$gene = maData$geneName
+    sig=setMAColor(handle$fdrVal, maData) #, handle$indToTrack)
+    geneColor$color = handle$maColor[sig]
+  }
   return(geneColor) 
 }
 
 #setMAColor gives codes 1, 2, 3, 4, 5 for the cases (up, down, non-significant, not available, tracked) of MA Data
 setMAColor = function(fdrVal, maData){ #}, indToTrack) {
-  sig <- rep(3, nrow(maData))
-  sig[which(maData$padj <= fdrVal & maData$log2FoldChange < 0 & abs(maData$log2FoldChange) >= 
-              maData$log2FoldChange & maData$detection_call == 1)] = 2
-  sig[which(maData$padj <= fdrVal & maData$log2FoldChange > 0 & abs(maData$log2FoldChange) >= 
-              maData$log2FoldChange & maData$detection_call == 1)] = 1
-  sig[which(is.na(maData$padj))] = 4
-  #sig[indToTrack] = 5
+  sig<-NULL
+  if (!is.null(maData)){
+    sig <- rep(3, nrow(maData)) # DEFAULT NOT SIGNIFICANT (P-VALUE>FDR)
+    sig[which((maData$pAdj <= fdrVal) & (maData$log2FoldChange < 0) & (abs(maData$log2FoldChange) >= 
+                maData$log2FoldChange) & (maData$detectionCall == 1))] = 2 # BLUE DOWN NEGATIVE
+    sig[which((maData$pAdj <= fdrVal) & (maData$log2FoldChange > 0) & (abs(maData$log2FoldChange) >= 
+                maData$log2FoldChange) & (maData$detectionCall == 1))] = 1 # RED UP POSITIVE
+    sig[which(is.na(maData$pAdj))] = 4 # NA DATA
+    #sig[indToTrack] = 5
+  }
   return(sig)}

@@ -1,3 +1,24 @@
+# Copyright: Ali Sheharyar (Texas AM University at Qatar), Michael Aupetit (Qatar Computing Research Institute)
+# October 25, 2020
+# Code Version 2
+# This file is part of "Enhanced MA plot"
+# 
+# "Enhanced MA plot" is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version. (GPL-3 or later)
+# 
+# "Enhanced MA plot" is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with "Enhanced MA plot" in the "COPYING" file  If not, see <https://www.gnu.org/licenses/>.
+#
+# Please cite the Github the code as: 
+# https://github.com/alisheharyar/Enhanced_MA_Plot
+
 server <- function(input, output,session) {
   
   
@@ -7,6 +28,8 @@ server <- function(input, output,session) {
   ######## TRIGGERS #########
   ###########################
   ###########################
+  
+  observe_helpers(withMathJax = TRUE) # enable help buttons
   
   #### FLush out all reactive
   
@@ -18,26 +41,42 @@ server <- function(input, output,session) {
   
   trigMAcore<- makeReactiveTrigger()
   
-  updateSliderInput(session, "filter_slider_cutOffX", 
-                    min=handle$ranges$X[1], 
-                    max=handle$ranges$X[2],
-                    value=handle$ranges$X)
-  
-  updateSliderInput(session, "filter_slider_cutOffY", 
-                    min=handle$ranges$Y[1], 
-                    max=handle$ranges$Y[2],
-                    value=handle$ranges$Y)
-  
-  
+   
   ############################################
   ############ LEFT SIDE PANEL ###############
   ############################################
-  observeEvent(input$loadData, {
-    showModal(modalDialog(fileInput(inputId="loadMA", label="MA data"),
-      title = "Load data...", "Here to load data"
-    ))
+  
+  # LOADING DATA
+  # MA data must come as table .CSV or as a "MAdata" dataframe saved in .RData file. 
+  # Columns must be named: geneName, baseMean, log2FoldChange, pAdj
+  observeEvent(input$loadData,{
+    inFile <- input$loadData
+    
+    if (is.null(inFile))
+    {
+      print("NO DATA LOADED")
+      return(NULL) 
+    }else{
+      print("DATA LOADED")
+        fileExt<-unlist(strsplit(inFile$datapath,"[.]"))[2]
+        if (fileExt=="csv"){
+          maData<-as.data.table(read.csv(inFile$datapath, header = TRUE))
+        }else{
+          load(inFile$datapath)
+          maData<-as.data.table(MAdata)
+        }
+        # initialize the interface with the new data
+        handle<<-initVar(handle)
+        handle<<-initData(session,handle,maData)
+        initUI(session)
+        
+        # replot
+        trigMAplot$trigger()
+      }
   })
 
+  
+  
   observeEvent(input$genesToTrack,{
    
     handle$genesToTrack<<-cleanStrGenesToTrack(input$genesToTrack)
@@ -49,28 +88,11 @@ server <- function(input, output,session) {
     
   })
 
-  observeEvent(input$buttonUniqueGeneTrack,{ # return all genes without duplicates
-    strGeneToTrack<-implode(unique(cleanStrGenesToTrack(input$genesToTrack)),sep=",")
-    updateTextAreaInput(session, inputId="genesToTrack", label = NULL, value = strGeneToTrack)
-  })
-  observeEvent(input$buttonMultiGeneTrack,{ # return only the genes who are there multiple times
-    cln<-cleanStrGenesToTrack(input$genesToTrack)
-    strGeneToTrack<-implode(unique(cln[duplicated(cln)]),sep=",")
-    updateTextAreaInput(session, inputId="genesToTrack", label = NULL, value = strGeneToTrack )
-  })
-  observeEvent(input$buttonSingleGeneTrack,{ # return only the genes who are there a single time
-    cln<-cleanStrGenesToTrack(input$genesToTrack)
-    strGeneToTrack<-implode(unique(cln[!is.element(cln,cln[duplicated(cln)])]),sep=",")
-    updateTextAreaInput(session, inputId="genesToTrack", label = NULL, value = strGeneToTrack )
-  })
-  observeEvent(input$buttonEmptyGeneTrack,{ # empty the list
-    handle$genesToTrack<<-NULL
-    updateTextAreaInput(session, inputId="genesToTrack", label = NULL, value = "")
-  })
   
   observeEvent(input$buttonTrackSelectedGenes,{ # refresh plots
     updateTextAreaInput(session, inputId="genesToTrack", label = NULL, 
-                        value = implode(sort(c(cleanStrGenesToTrack(input$genesToTrack),cleanStrGenesToTrack(input$selectedGenes_postFilter))),sep="  "))
+                        value = implode(sort(unique(c(cleanStrGenesToTrack(input$genesToTrack),
+                                                      cleanStrGenesToTrack(input$selectedGenes_postFilter)))),sep=" "))
   })
   
   ########################################
@@ -89,27 +111,32 @@ server <- function(input, output,session) {
   ###save the slider data in fdr when it is updated and trigger the update of the maplot
   
 
+  ### Slider Input of P-value cut-off
   observeEvent(input$fdr, {
 
     #updateLog(handle, "FDR Slider Moved")
 
     handle$fdrVal <<- isolate(input$fdr)
     #update the color gene column in colorGene and update handle$geneColor
-    handle$geneColor <<- assignColorToGene(handle, maData)
+    handle$geneColor <<- assignColorToGene(handle, handle$MAdataCur)
     
     # update the manual input
     updateTextInput(session, "fdr_txt", value=handle$fdrVal)
     
-    html(id="label_pvalue", paste("Current P-value = ",handle$fdrVal,""))
+    html(id="label_pvalue", paste("P-value Cut-off (FDR) =",handle$fdrVal))
     
     trigMAcore$trigger()
   })
   
+  ### Manual Text Input of P-value cut-off
   observeEvent(input$fdr_txt, {
-    handle$fdrVal <<- isolate(input$fdr_txt)
-    handle$geneColor <<- assignColorToGene(handle, maData)
+    handle$fdrVal <<- isolate(min(max(PvalLIM,input$fdr_txt),1-PvalLIM))
+    handle$geneColor <<- assignColorToGene(handle, handle$MAdataCur)
     
-    html(id="label_pvalue", paste("Current P-value = ",handle$fdrVal,""))
+    # update the manual input (needed when going out of range)
+    updateTextInput(session, "fdr_txt", value=handle$fdrVal)
+    
+    html(id="label_pvalue", paste("P-value Cut-off (FDR) =",handle$fdrVal))
     
     trigMAcore$trigger()
   })
@@ -121,50 +148,50 @@ server <- function(input, output,session) {
   observe({
     trigMAcore$depend()
 
-    # update genes to highlight in current MA data
-    handle$MAindToTrack<<-which(is.element(handle$MAdataCur$name,handle$genesToTrack))
-
+    # update genes to highlight remanent in current MA data
+    handle$MAindToTrack<<-which(is.element(handle$MAdataCur$geneName,handle$genesToTrack))
+    # update genes to highlight transient in current MA data (green dots)
+    handle$MAindToHighlight<<-which(is.element(handle$MAdataCur$geneName,handle$selectedGenes))
+    
     trigMAplot$trigger()
   })
 
   output$maPlot <- renderPlotly({
     #the rendering of the maplot will be triggered by the trigMaPlot triggers
     trigMAplot$depend()
-    input$filter_chk_cutOffX
     
-    filterX <- NULL
-    filterY <- NULL
-    
-    if(input$filter_chk_cutOffX) {
-      filterX1 <-  c(handle$ranges$X[1], input$filter_slider_cutOffX[1])
-      filterX2 <- c(input$filter_slider_cutOffX[2], handle$ranges$X[2])
-      filterX <- list(R1=filterX1, R2=filterX2, internal=!input$filter_chk_cutOffX_reverse)
+    if (!is.null(handle$MAdataCur)){
+      
+      filterX <- NULL
+      filterY <- NULL
+      
+        filterX1 <-  c(handle$ranges$X[1], input$filter_slider_cutOffX[1])
+        filterX2 <- c(input$filter_slider_cutOffX[2], handle$ranges$X[2])
+        filterX <- list(R1=filterX1, R2=filterX2, internal=!input$filter_chk_cutOffX_reverse)
+     
+        filterY1 = c(handle$ranges$Y[1], -input$filter_slider_cutOffY[1])
+        filterY2 = c(input$filter_slider_cutOffY[1], handle$ranges$Y[2])
+        filterY <- list(R1=filterY1, R2=filterY2, internal=input$filter_chk_cutOffY_reverse)
+      
+       g <- plotMA(handle, showHighlight=TRUE, title=NULL, discrete=F, 
+                  filterX=filterX, filterY=filterY)
+      
+      handle$curPlot <<- g
+      
+      p <- ggplotly(g, source="maPlot", tooltip=c('text'))
+      
+      p <- layout(p, dragmode = "select")
+      event_register(p, "plotly_selected")
+      
+    }else{
+      p<-ggplot()+annotate("text", x = 0, y = 0, label = "Please load some MA data to start...")+theme_void()
     }
-    
-    if(input$filter_chk_cutOffY) {
-      filterY1 = c(handle$ranges$Y[1], input$filter_slider_cutOffY[1])
-      filterY2 = c(input$filter_slider_cutOffY[2], handle$ranges$Y[2])
-      filterY <- list(R1=filterY1, R2=filterY2, internal=!input$filter_chk_cutOffY_reverse)
-    }
-    
-    #g <- plotMA(handle, showHighlight=FALSE, title=NULL, discrete=(input$fdr_scale=='Discrete'))
-    g <- plotMA(handle, showHighlight=FALSE, title=NULL, discrete=F, 
-                filterX=filterX, filterY=filterY)
-    
-    handle$curPlot <<- g
-
-    p <- ggplotly(g, source="maPlot", tooltip=c('text'))
-    
-    p <- layout(p, dragmode = "select")
-    event_register(p, "plotly_selected")
-    
-    #print(p)
   })
   
-  # Save the plot
-  output$buttonSaveMAPlot<-downloadHandler(
+  # Save the plot as PNG format
+  output$buttonSaveMAPlotPNG<-downloadHandler(
     filename=function(){
-      paste("enhanced_MA_plot_",Sys.Date(),".png",sep="")
+      paste("MAplot_",Sys.Date(),".png",sep="")
     },
     content=function(file) {
       p <- ggplot2::last_plot()
@@ -173,7 +200,20 @@ server <- function(input, output,session) {
     }
   )
   
-  #capture the brush event on maplot and copy data in handle 
+  # Save the plot as RData format
+  output$buttonSaveMAPlotRDATA<-downloadHandler(
+    filename=function(){
+      paste("MAplot_",Sys.Date(),".RData",sep="")
+    },
+    content=function(file) {
+      MAplot <- ggplot2::last_plot()
+      save(MAplot, file=file)
+    }
+  )
+  
+  
+  
+  ## LASSO SELECTION: capture the brush event on maplot and copy data in handle 
 observe({
   # updateLog(handle, "Data Brushed on MA Plot")
 
@@ -193,58 +233,53 @@ observe({
     trigMAselected$trigger()
   })
 
-  observe({
-    
-    d <- event_data("plotly_click", source = "maPlot")
-  
-    handle$MAindToHighlight <<- NULL
-    trigMAplot$trigger()
-  })
 
   #update Selected genes textArea
   observe({
     trigMAselected$depend()
 
     if(is.null(handle$maGeneBrushSelInfo)) {
-      value="Click and drag events in MA Plot (double click to clear)"
-      if(!is.null(handle$MAindToHighlight)) {
-        handle$MAindToHighlight <<- NULL
-        trigMAplot$trigger()
-      }
+      value="Genes selected by lasso/box in the plot will appear here... (double-click the plot to clear)"
+      # if(!is.null(handle$MAindToHighlight)) {
+      #   handle$MAindToHighlight <<- NULL
+      #   trigMAplot$trigger()
+      # }
     }else{
-      #value=c(handle$selectedGenes,handle$maGeneBrushSelInfo$name)
-      #handle$selectedMAdata<<-rbind(handle$selectedMAdata,handle$maGeneBrushSelInfo)
-      #handle$selectedGenes<<-value
-      value <- handle$maGeneBrushSelInfo$name
+      value <- handle$maGeneBrushSelInfo$geneName
     }
 
-    updateTextAreaInput(session, inputId="selectedGenes", label = NULL, value = implode(sort(value), "  "))
-    html(id="label_selected_genes", paste0("Lasso Selection (",length(value),")"))
+    updateTextAreaInput(session, inputId="selectedGenesByLasso", label = NULL, value = implode(sort(value), "  "))
+    html(id="label_selected_genes", paste0("Lassoed Genes (",length(value),")"))
   })
 
+  ## SAVE NOTES
   observeEvent(input$notes, {
     handle$notes <<- input$notes
   })
   
-  ## Empty list of selected genes if tab changes or if button reset is pressed
+  ## Empty list of selected genes if button Clear Selections is pressed
   observe({ # empty the list
-    input$tabs
-    input$buttonEmptySelectedGenes
+    input$buttonClearSelectedGenes
     
-    handle$selectedHIdata<<-NULL
     handle$selectedMAdata<<-NULL
     handle$selectedGenes<<-NULL
-    updateTextAreaInput(session, inputId="selectedGenes", label = NULL, value = "")
-    updateTextAreaInput(session, inputId="selectedGenes_preFilter", label = NULL, value = "")
+    initSELECT(session)
+  })
+  ## Empty list of tracked genes if button Clear Tracked is pressed
+  observe({ # empty the list
+    input$buttonClearTrackedGenes
     updateTextAreaInput(session, inputId="genesToTrack", label = NULL, value = "")
-    html(id="label_selected_genes", paste("Lasso Selection ( 0 )"))
-    html(id="label_selectedGenes_preFilter", "Count = 0")
   })
   
-  ### RESET USER NOTES
-  observeEvent(input$buttonEmptyUserNotes,{
-    updateTextAreaInput(session, inputId="userNotes", label = NULL, value = "")
+  ## RESET UI
+  observe({ # empty the list
+    input$buttonResetUI
+    
+    handle$selectedMAdata<<-NULL
+    handle$selectedGenes<<-NULL
+    initUI(session)
   })
+  
   
   ### POPUP TABLE VIEW OF MA DATA OF CURRENT SELECTED GENES
   observeEvent(input$buttonTableView,{
@@ -252,71 +287,122 @@ observe({
                             title="Table View"))
   })
   
-  ### DOWNLOAD BUTTON OF MA DATA OF CURRENT SELECTED GENES
-  output$buttonDownloadGenes<-downloadHandler(
+  ### DOWNLOAD BUTTON OF MA DATA OF CURRENT SELECTED GENES - csv format
+  output$buttonDownloadGenesCSV<-downloadHandler(
     filename=function(){
-      paste("MA_data_",Sys.Date(),".R",sep="")
-      },
+      paste0("MAdataSelected_",Sys.Date(),".csv")
+    },
     content=function(file){
-      #write.csv(handle$selectedMAdata,file)
-      save(handle, file=file)
-      }
-  )
+      write.csv(handle$selectedMAdata, file=file, row.names = FALSE) 
+    })
+  
+  ### DOWNLOAD BUTTON OF MA DATA OF CURRENT SELECTED GENES, PLOTS AND NOTES - RData format
+  output$buttonDownloadGenesRDATA<-downloadHandler(
+    filename=function(){
+      paste0("MAdataSelected_",Sys.Date(),".RData")
+    },
+    content=function(file){
+      MAdata<-handle$selectedMAdata
+      MAplot <- ggplot2::last_plot()
+      MAnotes <- handle$notes
+      save(MAdata, MAplot, MAnotes, MAnotes, file=file) 
+    })
+  
 
-  ### Populate the list of all genes
-  updateSelectInput(session, inputId='selectGenesByName', choices=maDataClean5[,"external_gene_name"])
-  
-  ### Handler for the 'Track Genes' button for the 'Selection By Name' list. 
-  observeEvent(input$buttonTrackSelectedGenesByName, {
-    updateTextAreaInput(session, inputId="genesToTrack", label = NULL, value = implode(sort(c(cleanStrGenesToTrack(input$genesToTrack),cleanStrGenesToTrack(implode(input$selectGenesByName)))),sep=","))
-  }, ignoreNULL=FALSE)
-  
-  
-  observeEvent(input$buttonMAplotClearHighlight, {
-    handle$MAindToHighlight <<- NULL
-    trigMAplot$trigger()
-  })
-  
+  # COPY-PASTING GENES IN SEARCH BOX BY GENE NAMES
   observe({
-    #trigMAcore$depend()
+    ## Put all gene names in capital letters
+    allSelectedGenes<-toupper(input$selectGenesByName)
     
-    # update genes to highlight in current MA data
-    handle$MAindToHighlight<<-which(is.element(handle$MAdataCur$name,input$selectGenesByName_click))
-    print(handle$MAindToHighlight)
+    if(!is.null(allSelectedGenes)){
+      ## check if gene is in available MA data
+      isin<-is.element(allSelectedGenes,handle$MAdataCur$geneName)
+      
+      ## Display list of genes NOT in the MA data
+      if (any(!isin))
+      {
+        showModal(modalDialog(
+          title = "Warning!",
+          paste0("These genes are not available in the current MA data, they will be removed: ",toString(allSelectedGenes[!isin]))
+        ))
+      }
+      
+      ## Update the list with only available genes
+      if (any(isin))
+      {
+        updateSelectInput(session, inputId='selectGenesByName', choices=handle$MAdataCur[,"geneName"],
+                        selected=allSelectedGenes[isin])
+      }else{
+        updateSelectInput(session, inputId='selectGenesByName', choices=handle$MAdataCur[,"geneName"],
+                          selected=character(0))
+      }
+    }
     
-    trigMAplot$trigger()
-  })
- 
-  # Filtering
+    })
+  
+  # FILTERING
   observe({
-    input$filter_chk_topK
-    input$filter_chk_ctg
-    input$filter_chk_cutOffX
-    input$filter_chk_cutOffY
-    #input$input$selectedGenes_preFilter
-    input$filterOccurence
-    input$selectedGenes
-    input$selectGenesByName
+    input$filter_val_topK # trigger on change of checkbox of topK genes
+    input$filterKeep  # trigger on change of boolean mixing of genes-by-names and genes-by-lasso sets
+    input$selectedGenesByLasso # trigger on lasso selection
+    input$selectGenesByName # trigger on change of search genes by names
+    input$fdr  #trigger on change of fdr P-value cut-off
+    input$filter_chk_cutOffX_reverse
+    input$filter_chk_cutOffY_reverse
+    
+    
+    # Update displayed text of Filter top/bottom K genes
+    if (input$filter_val_topK!=0)
+    {
+      if (input$filter_val_topK>0)
+        html(id="TopK_genes", paste("Keep ",input$filter_val_topK," most significant (lowest P-value)"))
+      if (input$filter_val_topK<0)
+        html(id="TopK_genes", paste("Keep ",abs(input$filter_val_topK)," least significant (highest P-value)"))
+    }else{
+      html(id="TopK_genes", paste("No Top/Bottom filter by P-value"))
+    }
+    
+    # update toggle buttons
+    if(input$filter_val_up)
+      updateButton(session, inputId="filter_val_up", icon = icon("ok",lib = "glyphicon"))
+    else
+      updateButton(session, inputId="filter_val_up", icon = character(0))
+    
+    if(input$filter_val_notsig)
+      updateButton(session, inputId="filter_val_notsig", icon = icon("ok",lib = "glyphicon"))
+    else
+      updateButton(session, inputId="filter_val_notsig", icon = character(0))
+    
+    if(input$filter_val_down)
+      updateButton(session, inputId="filter_val_down", icon = icon("ok",lib = "glyphicon"))
+    else
+      updateButton(session, inputId="filter_val_down", icon = character(0))
+    
+    
+    #### IF DATA LOADED
+    if (!is.null(handle$MAdataCur)){
+      
     
     # make a data frame from the selected genes
-    gnames <- c(input$selectGenesByName, cleanStrGenesToTrack(input$selectedGenes))
+    gnames <- c(input$selectGenesByName, cleanStrGenesToTrack(input$selectedGenesByLasso))
     
     
     # filter based on occurence
-    if(input$filterOccurence == 'Keep all') {
+    if(input$filterKeep == 'Keep all') {
       # don't do anything
     } 
-    else if(input$filterOccurence == 'Keep singles') {
+    else if(input$filterKeep == 'Keep singles') {
       gnames <- unique(gnames[!is.element(gnames,gnames[duplicated(gnames)])])
     } 
-    else if(input$filterOccurence == 'Keep multiples') {
+    else if(input$filterKeep == 'Keep multiples') {
       gnames <- unique(gnames[duplicated(gnames)])
     }
     
-    maDataSelected <- handle$MAdataCur %>% filter(name %in% gnames)
+    maDataSelected <- handle$MAdataCur %>% filter(geneName %in% gnames)
+    
+    
     
     # Filter on x-cutoff
-    if(input$filter_chk_cutOffX) {
       A <- input$filter_slider_cutOffX[1]
       B <- input$filter_slider_cutOffX[2]
       
@@ -330,52 +416,54 @@ observe({
       else {
         maDataSelected <- maDataSelected %>% filter(log2mean < A | B < log2mean)
       }
-    }
+
     
     # Filter on y-cutoff
-    if(input$filter_chk_cutOffY) {
-      A <- input$filter_slider_cutOffY[1]
-      B <- input$filter_slider_cutOffY[2]
+      A <- -(input$filter_slider_cutOffY)
+      B <- (input$filter_slider_cutOffY)
       
-      if(input$filter_chk_cutOffY_reverse) {
-        B <- input$filter_slider_cutOffY[1]
-        A <- input$filter_slider_cutOffY[2]
-      }
-      
-      # A<B: internal interval
-      if(!input$filter_chk_cutOffY_reverse) { 
+      #  internal interval
+      if(input$filter_chk_cutOffY_reverse) { 
         maDataSelected <- maDataSelected %>% filter(A <= log2FoldChange & log2FoldChange <= B)
       }
-      # A>B: external interval
+      #  external interval
       else {
         maDataSelected <- maDataSelected %>% filter(log2FoldChange < A | B < log2FoldChange)
       }
-    }
 
-    # Filter top K genes
-    if(input$filter_chk_topK)
-      maDataSelected <- maDataSelected %>% top_n(-input$filter_val_topK, wt=padj)
-    
-    # Filter on red/blue colors
-    if(input$filter_chk_ctg) {
-      maDataSelected$sig = setMAColor(handle$fdrVal, maDataSelected)
+
       
+    # Filter on red/grey/blue colors
+      maDataSelected$sig = setMAColor(handle$fdrVal, maDataSelected)
       maDataSelected1 <- NULL
       maDataSelected2 <- NULL
-      if('Up' %in% input$filter_val_ctg)
-        maDataSelected1 <- maDataSelected %>% filter(sig == 1)
-      if('Down' %in% input$filter_val_ctg)
-        maDataSelected2 <- maDataSelected %>% filter(sig == 2)
+      maDataSelected3 <- NULL
       
-      maDataSelected <- rbind(maDataSelected1, maDataSelected2) 
-    }
+      if(input$filter_val_up)
+        maDataSelected1 <- maDataSelected %>% filter(sig == 1)
+      if(input$filter_val_down)
+        maDataSelected2 <- maDataSelected %>% filter(sig == 2)
+      if(input$filter_val_notsig)
+        maDataSelected3 <- maDataSelected %>% filter(sig == 3)
+      
+      maDataSelected <- rbind(maDataSelected1, maDataSelected2, maDataSelected3) 
     
-    sel <- maDataSelected$name
+      # Filter top/bottom K genes
+      if (input$filter_val_topK!=0)
+      {
+        maDataSelected <- maDataSelected %>% top_n(-input$filter_val_topK, wt=pAdj)
+      }
+      
+    
+    sel <- maDataSelected$geneName
     
     updateTextAreaInput(session, inputId="selectedGenes_postFilter", label = NULL, value = implode(sort(sel), "  "))
-    html(id="label_selectedGenes_postFilter", paste("Selected Genes (",length(sel), ")"))
+    html(id="label_selectedGenes_postFilter", paste("Filtered Genes (",length(sel), ")"))
     
     handle$selectedMAdata<<-maDataSelected
     handle$selectedGenes<<-sel
+    
+    trigMAcore$trigger()
+    }
   })
 }
