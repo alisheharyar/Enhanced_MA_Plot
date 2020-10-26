@@ -265,7 +265,7 @@ ui <-  fluidPage(
                  actionButton(inputId="buttonTrackSelectedGenes", label="Append to Tracked", width = '100%'),
                  h4("Notes"),
                  textAreaInput(inputId="notes", label=NULL,
-                               value=handle$notes,placeholder="Write yobservations here... (Saved only with .RData)",
+                               value=handle$notes,placeholder="Write observations here... (Saved only with .RData)",
                                width="100%", rows="4"),
                  h4("Save Filtered MA data"),
                  fluidRow(
