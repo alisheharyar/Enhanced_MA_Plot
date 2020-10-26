@@ -200,9 +200,7 @@ ui <-  fluidPage(
                           title = "Set Filters",
                           content = c("Apply filters by checking boxes and set values.",
                                       "All filters are applied together (logical AND).", 
-                                      "Filtered genes are highlighted in orange in the MA plot.",
-                                      "Only significant genes (P-value <= FDR) are selected by default.",
-                                      "Check the \"Not sign.\" button to add not-significant genes to the selection if needed."),
+                                      "Filtered genes are highlighted in orange in the MA plot."),
                           size = "m"),
                  fluidRow(
                         column(4, h5(div("Log2(Mean Expr.)"))),
@@ -210,13 +208,11 @@ ui <-  fluidPage(
                         column(2, checkboxInput(inputId="filter_chk_cutOffX_reverse", label="Reverse interval"))
                   ),
                  fluidRow(
-                        #column(4, checkboxInput(inputId = "filter_chk_cutOffY", label = div("Cut-off at", br(), "(Y-axis)"))),
                         column(4, h5(div("Log2(Fold Change)"))),
                         column(5, sliderInput("filter_slider_cutOffY", label=NULL, step=1, min=0, max=16, value=0)),
                         column(2, checkboxInput(inputId="filter_chk_cutOffY_reverse", label="Reverse interval"))
                   ),
                  fluidRow(
-                        #column(6, checkboxInput(inputId="filter_chk_topK", label="Top-K by P-value")
                         column(8, h5(id="TopK_genes","No Top/Bottom rank filter by P-value if 0")
                                %>% 
                                  helper(type = "inline",
@@ -231,7 +227,7 @@ ui <-  fluidPage(
                         column(4, 
                                bsButton(
                                  inputId = "filter_val_down", 
-                                 label = "Down",
+                                 label = "Down -",
                                  type = "toggle",
                                  block=TRUE,
                                  value = TRUE, 
@@ -243,13 +239,13 @@ ui <-  fluidPage(
                                  label = "Not Sig.",
                                  type = "toggle",
                                  block=TRUE,
-                                 value = FALSE, 
+                                 value = TRUE, 
                                  icon =  character(0))
                         ),
                         column(4, 
                                bsButton(
                                  inputId = "filter_val_up", 
-                                 label = "Up",
+                                 label = "Up +",
                                  type = "toggle",
                                  block=TRUE,
                                  value = TRUE, 
