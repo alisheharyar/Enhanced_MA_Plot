@@ -1,6 +1,7 @@
 # ggmaplot2 is modified from https://github.com/kassambara/ggpubr/blob/master/R/ggmaplot.R
 # ggmaplot from library("ggpubr")  
 # it serves at plotting the MAplot in Enhanced MA plot V2
+# library("ggpubr")
 
 parse_font <- function(font){
   if(is.null(font)) res <- NULL
@@ -24,8 +25,8 @@ ggmaplot2<-function (data, indToTrack=NULL,indToHighlight=NULL, fdr = 0.05, fc =
                      label.rectangle = FALSE,
                      palette = c("#B31B21", "#1465AC", "darkgray", "yellow","green"), top = 15,
                      select.top.method = c("pAdj", "fc"), main = NULL, 
-                     xlab = "Log2 mean expression",
-                     ylab = "Log2 fold change", 
+                     xlab = "Log2(1 + Mean expression)",
+                     ylab = "Log2(Fold change)", 
                      ggtheme = theme_classic(), 
                      legend = "top", 
                      discrete=T, p,
@@ -158,6 +159,8 @@ ggmaplot2<-function (data, indToTrack=NULL,indToHighlight=NULL, fdr = 0.05, fc =
                      highlighted=rep(FALSE,nrow(data)), 
                      stringsAsFactors = FALSE)
   
+  
+  
   if (!is.null(indToTrack)) data$tracked[indToTrack]<-TRUE
   
   if (!is.null(indToHighlight) && length(indToHighlight)>0) data$highlighted[indToHighlight]<-TRUE
@@ -252,7 +255,7 @@ ggmaplot2<-function (data, indToTrack=NULL,indToHighlight=NULL, fdr = 0.05, fc =
                             fill=pFoldDummy, colour=pFoldDummy, 
                             text=paste0('</br>Gene name: ', name, '</br>',
                                        'P-value: ', format(pAdj, digits=5), '</br>',
-                                       'Log2(Mean Expression): ', round(log2mean, digits = 2), '</br>',
+                                       'Log2(1 + Mean Expression): ', round(log2mean, digits = 2), '</br>',
                                        'Log2(Fold Change): ', round(log2FC, digits = 2), '</br>')), 
                         size = 1.5, stroke=0,
                         pch = 21) + 
@@ -261,7 +264,7 @@ ggmaplot2<-function (data, indToTrack=NULL,indToHighlight=NULL, fdr = 0.05, fc =
       scale_color_manual(values = cols, guide=F) + 
       scale_fill_manual(values = cols, guide=F)
     
-    p <- ggpar(p, ggtheme = ggtheme)
+    p <- p + ggtheme #ggpar(p, ggtheme = ggtheme)
     p <- p + 
       theme(
         legend.position = c(.95, .35),

@@ -181,7 +181,7 @@ plotMA = function(handle, showHighlight=FALSE, title=NULL, discrete=T, filterX, 
                   palette = handle$maColor, 
                   top = 15, select.top.method = "padj", 
                   main = title, 
-                  xlab = "Log2 mean expression", ylab = "Log2 fold change", 
+                  xlab = "Log2(1 + Mean expression)", ylab = "Log2(Fold change)", 
                   ggtheme = theme_classic(),legend = "top", 
                   discrete=discrete, p)
   

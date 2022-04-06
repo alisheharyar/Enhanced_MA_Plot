@@ -95,15 +95,34 @@ ui <-  fluidPage(
                                        " ",
                                        "Other functions are given as tooltips on hover/? of the corresponding widgets.",
                                        "",
-                                       "Credits:",
+                                       "CREDITS:",
                                        "Copyright: Dr. Ali Sheharyar (Texas AM University at Qatar), Dr. Michael Aupetit (Qatar Computing Research Institute)",
-                                       "October 25, 2020. Code Version 2. Released under license GPL-3 or later",
+                                       "April 4, 2022. Code Version 3. Released under license GPL-3 or later",
                                        "Design study conducted by Mrs. Talar Boghos Yacoubian (MSc HBKU)",
                                        "Supervisors: Dr. Dena Al Thani (HBKU CSE), Dr. Michael Aupetit (QCRI)",
                                        "Expert users: Ms. Dina Aljogol (HBKU CHLS) and Pr. Borbala Mifsud (HBKU CHLS)",
-                                       "Please refer/cite the code as: ",
-                                       "https://github.com/alisheharyar/Enhanced_MA_Plot"
-                                       ),
+                                       " ",
+                                       "The related paper is available here: https://arxiv.org/abs/2012.04411",
+                                       "",
+                                       "HOW TO CITE:",
+                                       "Please refer to the code as: ",
+                                       "https://github.com/alisheharyar/Enhanced_MA_Plot",
+                                       "",
+                                       "and cite the BioVis 2020 paper as: ",
+                                       "@misc{enhancedMAplot2020,",
+                                       "  author    = {Ali Sheharyar and ",
+                                       "               Talar Boghos Yacoubian and",
+                                       "               Dina Aljogol and",
+                                       "               Borbala Mifsud and",
+                                       "               Dena Al{-}Thani and",
+                                       "               Micha{\"{e}}l Aupetit},",
+                                       "  title     = {An Enhanced {MA} Plot with {R}-{S}hiny to Ease Exploratory Analysis of Transcriptomic Data},",
+                                       "  note      = {BioVis at IEEE Vis 2020 Challenges Workshop [Online accessed 4-April-2022]},", 
+                                       "  year      = {2020},",
+                                       "  howpublished = \"\\url{https://arxiv.org/abs/2012.04411}\",",
+                                       "}",
+                                       ""
+                                      ),
                            size = "l"),
                   fileInput("loadData", label=NULL,
                             accept = c(
@@ -113,10 +132,13 @@ ui <-  fluidPage(
                               ".RData")
                   ),
                   fluidRow(
-                    column(6,actionButton(inputId="buttonLoadTestData", label="Test Data...", width = '100%')),
-                    column(6,actionButton(inputId="buttonResetUI", label="Reset...", width = '100%'))),
+                    column(6,actionButton(inputId="buttonLoadTestData", label="Test Data...", width = '100%'),
+                           actionButton(inputId="buttonResetUI", label="Reset...", width = '100%')),
+                    column(6,downloadButton(outputId="buttonDownloadTestDataCSV", label=".csv"))),
                   bsTooltip("buttonLoadTestData", "Checked means test data are displayed.",
                             "right", trigger = "hover"),
+                  bsTooltip("buttonDownloadTestDataCSV", "Download the test data as a CSV file to check the format.",
+                            "left", trigger = "hover"),
                   bsTooltip("buttonResetUI", "Reset all selections and tracked genes.",
                             "right", trigger = "hover"),
                   br(),
@@ -191,7 +213,8 @@ ui <-  fluidPage(
                         radioGroupButtons(
                           inputId='filterKeep', choices = c('Keep all', 'Keep singles', 'Keep multiples'), selected = c('Keep all'), status = 'default',
                           justified = TRUE, checkIcon = list(yes = icon("ok",lib = "glyphicon"), individual=T) 
-                        )
+                        ),
+                        bsTooltip("filterKeep", "Cross filter between Searched and Lassoed genes.", trigger = "hover")
                  )
           ),
           column(4,
@@ -203,7 +226,7 @@ ui <-  fluidPage(
                                       "Filtered genes are highlighted in orange in the MA plot."),
                           size = "m"),
                  fluidRow(
-                        column(4, h5(div("Log2(Mean Expr.)"))),
+                        column(4, h5(div("Log2(1 + Mean Expr.)"))),
                         column(5, sliderInput("filter_slider_cutOffX", label=NULL, step=0.1, min=0, max=100, value=c(0,100))),
                         column(2, checkboxInput(inputId="filter_chk_cutOffX_reverse", label="Reverse interval"))
                   ),

@@ -7,4 +7,19 @@ The BioVis 2020 workshop program can be found [here](http://biovis.net/2020/prog
 
 The final paper can be found [here](/_BioVis2020__Interactive_MA_plot_FINAL.pdf)
 
-You can try the application online at: https://michaelaupetit.shinyapps.io/EnhancedMAplot_V2/
+You can try the application online at: https://michaelaupetit.shinyapps.io/EnhancedMAplot_V3/
+
+## How to cite this work:
+ 
+@misc{enhancedMAplot2020,
+    author = {Ali Sheharyar and
+    Talar Boghos Yacoubian and
+    Dina Aljogol and
+    Borbala Mifsud and
+    Dena Al{-}Thani and
+    Micha{"{e}}l Aupetit},
+    title = {An Enhanced {MA} Plot with {R}-{S}hiny to Ease Exploratory Analysis of Transcriptomic Data},
+    note = {BioVis at IEEE Vis 2020 Challenges Workshop [Online accessed 4-April-2022]},
+    year = {2020},
+    howpublished = "\url{https://arxiv.org/abs/2012.04411}",
+}

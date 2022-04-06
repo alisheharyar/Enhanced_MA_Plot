@@ -55,7 +55,7 @@ server <- function(input, output,session) {
     if (is.null(inFile))
     {
       print("NO DATA LOADED")
-      return(NULL) 
+      return(NULL)
     }else{
       print("DATA LOADED")
         fileExt<-unlist(strsplit(inFile$datapath,"[.]"))[2]
@@ -68,16 +68,90 @@ server <- function(input, output,session) {
         # initialize the interface with the new data
         handle<<-initVar(handle)
         handle<<-initData(session,handle,maData)
-        initUI(session)
         
-        # replot
-        trigMAplot$trigger()
+        if (is.null(handle$MAdataCur)){
+          resetAll()
+          # replot
+          trigMAplot$trigger()
+        }else{
+          initUI(session)
+          
+          updateActionButton(session,inputId="buttonLoadTestData", icon = character(0))
+          # replot
+          trigMAplot$trigger()
+        }
       }
   })
 
+  ### LOAD TEST DATA
+  observeEvent(input$buttonLoadTestData,{
+      showModal(modalDialog(
+        tagList(), 
+        title="This will reset all selections and replace currently loaded data, do you want to continue?",
+        footer = tagList(actionButton("confirmLoadTest", "Yes, load test data"),
+                         modalButton("No, cancel")
+        )
+      ))
+  })
+  observeEvent(input$confirmLoadTest,{  
+    inFile <- input$confirmLoadTest
+    if (is.null(inFile))
+    {
+    }else{
+      print("DATA LOADED")
+      load("MAdata.RData")
+      maData<-as.data.table(MAdata)
+      
+      # initialize the interface with the new data
+      handle<<-initVar(handle)
+      handle<<-initData(session,handle,maData)
+      initUI(session)
+      
+      updateActionButton(session,inputId="buttonLoadTestData", icon =  icon("ok",lib = "glyphicon"))
+      
+      # replot
+      trigMAplot$trigger()
+    }
+    # Remove modal dialog
+    removeModal()
+  })  
   
   
-  observeEvent(input$genesToTrack,{
+  ## RESET UI
+  observeEvent(input$buttonResetUI,{
+    showModal(modalDialog(
+      tagList(), 
+      title="This will reset all selected and tracked genes, do you want to continue?",
+      footer = tagList(actionButton("confirmResetUI", "Yes, reset"),
+                       modalButton("No, cancel")
+      )
+    ))
+  })
+observeEvent(input$confirmResetUI,{ # empty the list
+    
+  if (!is.null(input$confirmResetUI))
+  {
+    resetAll()
+    # replot
+    trigMAplot$trigger()
+  }
+  # Remove modal dialog
+  removeModal()
+})
+  
+resetAll = function(){
+  handle$selectedMAdata<<-NULL
+  handle$selectedGenes<<-NULL
+  
+  handle<<-initVar(handle)
+  handle<<-initData(session,handle,NULL)
+  initUI(session)
+  updateActionButton(session,inputId="buttonLoadTestData", icon = character(0))
+  
+}
+
+
+observeEvent(input$genesToTrack,{
    
     handle$genesToTrack<<-cleanStrGenesToTrack(input$genesToTrack)
 
@@ -270,16 +344,7 @@ observe({
     input$buttonClearTrackedGenes
     updateTextAreaInput(session, inputId="genesToTrack", label = NULL, value = "")
   })
-  
-  ## RESET UI
-  observe({ # empty the list
-    input$buttonResetUI
-    
-    handle$selectedMAdata<<-NULL
-    handle$selectedGenes<<-NULL
-    initUI(session)
-  })
-  
+
   
   ### POPUP TABLE VIEW OF MA DATA OF CURRENT SELECTED GENES
   observeEvent(input$buttonTableView,{
@@ -295,6 +360,19 @@ observe({
     content=function(file){
       write.csv(handle$selectedMAdata, file=file, row.names = FALSE) 
     })
+
+  ### DOWNLOAD BUTTON OF MA TEST DATA - csv format
+  output$buttonDownloadTestDataCSV<-downloadHandler(
+    filename=function(){
+      paste0("MAdataTEST.csv")
+    },
+    content=function(file){
+      load("MAdata.RData")
+      maDataTEST<-as.data.table(MAdata)
+      
+      write.csv(maDataTEST, file=file, row.names = FALSE) 
+    })
+  
   
   ### DOWNLOAD BUTTON OF MA DATA OF CURRENT SELECTED GENES, PLOTS AND NOTES - RData format
   output$buttonDownloadGenesRDATA<-downloadHandler(

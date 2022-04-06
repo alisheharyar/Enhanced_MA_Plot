@@ -28,6 +28,7 @@ library(shinyjs)
 library(shinyWidgets)
 library(shinyBS) # tooltip
 library(shinyhelper) # help button
+library(shinyalert) # popup alert
 
 source ("utils.R") #triggers for the interface
 source ("ggmaplot2.R") #new maplot with yellow color for NA data
@@ -45,6 +46,8 @@ handle<-NULL
 
 #### HANDLE GLOBAL VARIABLES
 PvalLIM=10^-8
+EXPCOLNAMES <- c("geneName", "baseMean", "log2FoldChange", "pAdj")
+
 
 initVar<-function(handle){
   #list of global state variables 
@@ -63,7 +66,7 @@ initVar<-function(handle){
   handle$selectedGenes<- NULL  # names of the currently selected genes
   
  
-  
+ 
   handle$maColor <- c("#B31B21", "#1465AC", "darkgray", "yellow","green") # for the cases (up, down, non-significant, not available,tracked) of MA Data
   handle$defaultBarColor <- "#000000"
   handle$maColorLabels <- c("Up-regulated", "Down-regulated", "Not significant", "N/A", "Tracked")
@@ -74,7 +77,8 @@ initVar<-function(handle){
                               colour=c(handle$maColor[5], handle$maColor[4], 
                                        my_rgb(192,0,0), my_rgb(255,51,51), my_rgb(255,127,127), "darkgray",
                                        my_rgb(91,156,213), my_rgb(46,117,182), my_rgb(32,78,121)),
-                              label=c("Tracked", "N/A", "Up-high", "Up-mid", "Up-low", "Not significant", "Down-low", "Down-mid", "Down-high"), 
+                              #label=c("Tracked", "N/A", "Up-high", "Up-mid", "Up-low", "Not significant", "Down-low", "Down-mid", "Down-high"), 
+                              label=c("Tracked", "N/A", "+++", "++", "+", "Not sign.", "-", "- -", "- - -"), 
                               stringsAsFactors = FALSE)
   
   handle$maPlotHighlight <- NULL #gene name to highlight on MA Plot based on the selected gene in hi-C Bar Chart
@@ -115,22 +119,54 @@ initSELECT<-function(session)
 # INIT DATA and data-dependent variables (called when loading data)
 initData<-function(session,handle,maData){
   if(is.null(maData)){
-    
+    handle$MAdataCur<<-NULL
+    return(NULL)
   }else{
+    
+    # Check data validity
+    # Check if all necessary fields are present
+    missingNames = setdiff(EXPCOLNAMES,names(maData))
+    if (length(missingNames)>0){
+      # Missing necessary columns
+      # send a popup message
+      shinyalert("Oops!", paste("ERROR: Data loading cancelled because of missing columns:",paste(missingNames,collapse=", ")), type = "error")
+      handle$MAdataCur<<-NULL
+      return(NULL)
+    }
+    
+    # Check if no forbidden values
+    indNeg = which(maData$baseMean<=-1)  # we plot log2(baseMean+1) on x-axis
+    if (length(indNeg)>0) {
+      # WARNING: baseMean values must be >0 as we take their log2
+      # send a popup message
+      shinyalert("Oops!", paste("ERROR: Data loading cancelled because 'baseMean' data column contains values lower or equal to -1 for genes:",
+                                paste(maData$geneName[indNeg],collapse=", ")), type = "error")
+      handle$MAdataCur<<-NULL
+      return(NULL)
+    }
+    
     handle$MAdataCur<-maData ## store current MA data to use as input in MA interface
     if (is.null(handle$MAdataCur$detectionCall)){
       handle$MAdataCur$detectionCall=1
     }
     
+    
+    
+    
     # convert to capital letters all gene names
     handle$MAdataCur$geneName<-toupper(handle$MAdataCur$geneName)
     
     # pre-computing for mapping the up/down to -1 to 1 range. (-ve for down/blue and +ve for red/up genes)
-    handle$MAdataCur$pFold <- handle$MAdataCur$pAdj*(handle$MAdataCur$log2FoldChange/abs(handle$MAdataCur$log2FoldChange))
+    # some tiny amount is added to get the signed value even if p-value is 0.
+    indZero = which(handle$MAdataCur$pAdj==0)
+    indNonZero = which(handle$MAdataCur$pAdj!=0)
+    handle$MAdataCur$pFold <- (handle$MAdataCur$pAdj+5e-324)*sign(handle$MAdataCur$log2FoldChange)
+    handle$MAdataCur$pFold[indZero] <- (5e-324)*sign(handle$MAdataCur$log2FoldChange[indZero])
+    handle$MAdataCur$pFold[indNonZero] <- (handle$MAdataCur$pAdj[indNonZero])*sign(handle$MAdataCur$log2FoldChange[indNonZero])
     
     
     # axes ranges to set the cut-off filter slider ranges
-    handle$ranges <- list(X=c(floor(min(log2(handle$MAdataCur$baseMean),2)), ceiling(max(log2(handle$MAdataCur$baseMean),2))), 
+    handle$ranges <- list(X=c(floor(min(log2(1+handle$MAdataCur$baseMean),2)), ceiling(max(log2(1+handle$MAdataCur$baseMean),2))), 
                           Y=c(floor(min(handle$MAdataCur$log2FoldChange, 2)), ceiling(max(handle$MAdataCur$log2FoldChange, 2))))
     
     
