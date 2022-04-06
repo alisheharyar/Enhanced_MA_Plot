@@ -12,14 +12,14 @@ You can try the application online at: https://michaelaupetit.shinyapps.io/Enhan
 ## How to cite this work:
  
 @misc{enhancedMAplot2020,
-    author = {Ali Sheharyar and
-    Talar Boghos Yacoubian and
-    Dina Aljogol and
-    Borbala Mifsud and
-    Dena Al{-}Thani and
-    Micha{"{e}}l Aupetit},
-    title = {An Enhanced {MA} Plot with {R}-{S}hiny to Ease Exploratory Analysis of Transcriptomic Data},
-    note = {BioVis at IEEE Vis 2020 Challenges Workshop [Online accessed 4-April-2022]},
-    year = {2020},
-    howpublished = "\url{https://arxiv.org/abs/2012.04411}",
+author = {Ali Sheharyar and
+Talar Boghos Yacoubian and
+Dina Aljogol and
+Borbala Mifsud and
+Dena Al{-}Thani and
+Micha{"{e}}l Aupetit},
+title = {An Enhanced {MA} Plot with {R}-{S}hiny to Ease Exploratory Analysis of Transcriptomic Data},
+note = {BioVis at IEEE Vis 2020 Challenges Workshop [Online accessed 4-April-2022]},
+year = {2020},
+howpublished = "\url{https://arxiv.org/abs/2012.04411}",
 }
